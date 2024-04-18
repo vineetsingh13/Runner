@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id ("com.google.dagger.hilt.android")
 }
 
 android {
@@ -97,6 +98,9 @@ dependencies {
 
     //charts
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
-    implementation("android.arch.lifecycle:extensions:1.1.1")
+    implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
+
+    implementation("com.google.dagger:hilt-android:2.46.1")
+    ksp("com.google.dagger:hilt-compiler:2.46.1")
 
 }

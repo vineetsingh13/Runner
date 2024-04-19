@@ -93,8 +93,7 @@ dependencies {
 //    api("com.google.dagger:dagger-android-support:2.28.1")
 //    ksp("com.google.dagger:dagger-android-processor:2.23.2")
 
-    //easy permissions
-    implementation("pub.devrel:easypermissions:3.0.0")
+
 
     //timber
     implementation("com.jakewharton.timber:timber:4.7.1")
@@ -105,6 +104,7 @@ dependencies {
 
     implementation("com.google.dagger:hilt-android:2.48")
     ksp("com.google.dagger:hilt-android-compiler:2.48")
+    
 
 }
 

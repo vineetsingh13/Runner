@@ -7,15 +7,18 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationRequest
 import android.os.Build
+import android.os.Looper
+import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.app.NotificationManagerCompat.IMPORTANCE_LOW
-import androidx.core.content.ContentProviderCompat.requireContext
-import androidx.core.content.getSystemService
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Observer
 import com.example.runner.OTHER.Constants
 import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
@@ -25,11 +28,44 @@ import com.example.runner.OTHER.Constants.NOTIFICATION_CHANNEL_NAME
 import com.example.runner.OTHER.Constants.NOTIFICATION_ID
 import com.example.runner.R
 import com.example.runner.ui.MainActivity
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.maps.model.LatLng
 import timber.log.Timber
 
+typealias polyline=MutableList<LatLng>
+typealias polylines=MutableList<polyline>
 class TrackingService: LifecycleService() {
 
     var isFirstRun=true
+
+    lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+
+    companion object{
+        val isTracking=MutableLiveData<Boolean>()
+
+        val pathPoints = MutableLiveData<polylines>()
+
+    }
+
+    private fun postInitialValues(){
+
+        isTracking.postValue(false)
+        pathPoints.postValue(mutableListOf())
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        postInitialValues()
+        fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(this)
+
+        isTracking.observe(this, Observer {
+            updateLocationTracking(it)
+        })
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
 
@@ -55,7 +91,86 @@ class TrackingService: LifecycleService() {
     }
 
 
+    //what this functions does is if the tracking is true
+    //we want to receive location updates and if its not then we dont
+    private fun updateLocationTracking(isTracking: Boolean){
+        if(isTracking){
+            val request=com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000)
+                .setIntervalMillis(2000)
+                .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
+                .setMinUpdateIntervalMillis(2000)
+                .build()
+
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                Toast.makeText(this,"Enable Location Permissions", Toast.LENGTH_SHORT).show()
+                return
+            }
+            fusedLocationProviderClient.requestLocationUpdates(
+                request,
+                locationCallback,
+                Looper.getMainLooper()
+            )
+        }else{
+            fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+        }
+    }
+
+    //used for getting continuous location updates or changes
+    //so basic structure with locationCallBack we get the new or updated location
+    //using addPathPoint we add the new location at the back of our list
+    //then we add the list to our list
+    val locationCallback=object: LocationCallback(){
+        override fun onLocationResult(result: LocationResult) {
+            super.onLocationResult(result)
+
+            if(isTracking.value!!){
+                result.locations.let {
+                    locations -> for (location in locations){
+                        addPathPoint(location)
+                        Timber.d("new location: ${location.latitude},${location.longitude}")
+                    }
+                }
+            }
+        }
+    }
+
+
+    //in this function what we are doing is
+    //the user walks so a location comes so we add the location's lat and long to our list
+    //then we add that list to pathPoints list
+    private fun addPathPoint(location: Location?){
+        location?.let {
+            val pos=LatLng(location.latitude, location.longitude)
+            pathPoints.value?.apply {
+                last().add(pos)
+                pathPoints.postValue(this)
+            }
+        }
+    }
+
+    //what this function does is
+    //when the user stops the tracking and walks certain mile then that distance would not be considered
+    //so instead of adding coordinated we add empty list when the user stops a run
+    //also if the initial value is null we add the mutable list of list of coordiantes
+    private fun addEmptyPolyline()= pathPoints.value?.apply {
+        add(mutableListOf())
+        pathPoints.postValue(this)
+
+    } ?: pathPoints.postValue(mutableListOf(mutableListOf()))
+
+
+
     private fun startForegroundService(){
+
+        addEmptyPolyline()
+        isTracking.postValue(true)
         val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O){

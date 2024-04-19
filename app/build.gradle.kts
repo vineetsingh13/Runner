@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
     id ("com.google.dagger.hilt.android")
+    kotlin("kapt")
 }
 
 android {
@@ -35,6 +36,10 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    
+    viewBinding {
+        enable=true
+    }
 }
 
 dependencies {
@@ -47,8 +52,6 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 
-    //material design
-    implementation("com.google.android.material:material:1.11.0")
 
     //architectural components
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
@@ -81,14 +84,14 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
 
     //dagger core
-    implementation("com.google.dagger:dagger:2.28.3")
-    ksp("com.google.dagger:dagger-compiler:2.25.2")
+    implementation("com.google.dagger:dagger:2.48")
+    ksp("com.google.dagger:dagger-compiler:2.48")
 
 
     //dagger android
-    api("com.google.dagger:dagger-android:2.28.1")
-    api("com.google.dagger:dagger-android-support:2.28.1")
-    ksp("com.google.dagger:dagger-android-processor:2.23.2")
+//    api("com.google.dagger:dagger-android:2.28.1")
+//    api("com.google.dagger:dagger-android-support:2.28.1")
+//    ksp("com.google.dagger:dagger-android-processor:2.23.2")
 
     //easy permissions
     implementation("pub.devrel:easypermissions:3.0.0")
@@ -100,7 +103,8 @@ dependencies {
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
     implementation("androidx.lifecycle:lifecycle-extensions:2.2.0")
 
-    implementation("com.google.dagger:hilt-android:2.46.1")
-    ksp("com.google.dagger:hilt-compiler:2.46.1")
+    implementation("com.google.dagger:hilt-android:2.48")
+    ksp("com.google.dagger:hilt-android-compiler:2.48")
 
 }
+

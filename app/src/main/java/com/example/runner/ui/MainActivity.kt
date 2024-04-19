@@ -1,11 +1,13 @@
 package com.example.runner.ui
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
+import com.example.runner.OTHER.Constants.ACTION_SHOW_TRACKING_FRAGMENT
 import com.example.runner.R
 import com.example.runner.databinding.ActivityMainBinding
 import com.example.runner.db.RunDAO
@@ -16,6 +18,8 @@ import javax.inject.Inject
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding=ActivityMainBinding.inflate(layoutInflater)
@@ -23,7 +27,8 @@ class MainActivity : AppCompatActivity() {
 
         setSupportActionBar(binding.toolbar)
 
-        val navHostFragment = supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
+        navigateToTrackingFragment(intent)
+        var navHostFragment= supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
 
         binding.bottomNavigationView.setupWithNavController(navHostFragment.navController)
 
@@ -36,5 +41,16 @@ class MainActivity : AppCompatActivity() {
 
                 }
             }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        navigateToTrackingFragment(intent)
+    }
+    private fun navigateToTrackingFragment(intent: Intent?){
+        if(intent?.action == ACTION_SHOW_TRACKING_FRAGMENT){
+            val navHostFragment= supportFragmentManager.findFragmentById(R.id.navHostFragment) as NavHostFragment
+            navHostFragment.navController.navigate(R.id.action_global_tracking_fragment)
+        }
     }
 }

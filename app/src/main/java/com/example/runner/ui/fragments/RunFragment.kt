@@ -19,18 +19,39 @@ import dagger.hilt.android.AndroidEntryPoint
 
 
 @AndroidEntryPoint
-class RunFragment: Fragment(R.layout.fragment_run){
+class RunFragment : Fragment(R.layout.fragment_run) {
 
     private val viewModel: MainViewModel by viewModels()
     private lateinit var binding: FragmentRunBinding
 
+    private val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        )
+
+    } else {
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+    }
+
+    private var permissionIndex = 0
     val req = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
+        ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted.isEmpty()) {
-            Log.e("permissions","not granted")
+        if (isGranted) {
+            Log.e("permissions", "not granted")
+            Log.e("permissions", "${permissions[permissionIndex]} granted")
+            permissionIndex++
+            if (permissionIndex < permissions.size) {
+                startLocationPermissionRequest(permissions[permissionIndex])
+            }
         } else {
-            Log.e("permissions","granted")
+            Log.e("permissions", "${permissions[permissionIndex]} not granted")
         }
     }
 
@@ -46,7 +67,7 @@ class RunFragment: Fragment(R.layout.fragment_run){
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startLocationPermissionRequest()
+        startLocationPermissionRequest(permissions[permissionIndex])
     }
 
     override fun onCreateView(
@@ -54,18 +75,14 @@ class RunFragment: Fragment(R.layout.fragment_run){
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
-        binding= FragmentRunBinding.inflate(layoutInflater)
+        binding = FragmentRunBinding.inflate(layoutInflater)
 
 
         return binding.root
     }
 
-    private fun startLocationPermissionRequest() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            req.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_BACKGROUND_LOCATION))
-        }else{
-            req.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
-        }
+    private fun startLocationPermissionRequest(permission: String) {
+        req.launch(permission)
     }
 
 }

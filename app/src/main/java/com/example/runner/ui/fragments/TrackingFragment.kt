@@ -24,6 +24,7 @@ import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
 import com.example.runner.OTHER.Constants.MAP_ZOOM
 import com.example.runner.OTHER.Constants.POLYLINE_COLOR
 import com.example.runner.OTHER.Constants.POLYLINE_WIDTH
+import com.example.runner.OTHER.TrackingUtility
 import com.example.runner.R
 import com.example.runner.databinding.FragmentTrackingBinding
 import com.example.runner.services.TrackingService
@@ -46,6 +47,8 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
     private var pathPoints= mutableListOf<polyline>()
 
     private var map: GoogleMap? = null
+
+    private var currentTimeMillis=0L
 
     var hasNotificationPermissionGranted = false
 
@@ -146,6 +149,12 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
             pathPoints=it
             addLatestPolyline()
             moveCameraToUser()
+        })
+
+        TrackingService.timeRunInMillis.observe(viewLifecycleOwner, Observer {
+            currentTimeMillis=it
+            val formattedTime=TrackingUtility.getFormattedStopWatchTime(currentTimeMillis,true)
+            binding.tvTimer.text=formattedTime
         })
     }
 

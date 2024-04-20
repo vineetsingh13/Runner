@@ -26,6 +26,7 @@ import com.example.runner.OTHER.Constants.ACTION_STOP_SERVICE
 import com.example.runner.OTHER.Constants.NOTIFICATION_CHANNEL_ID
 import com.example.runner.OTHER.Constants.NOTIFICATION_CHANNEL_NAME
 import com.example.runner.OTHER.Constants.NOTIFICATION_ID
+import com.example.runner.OTHER.Constants.TIMER_UPDATER_INTERVAL
 import com.example.runner.R
 import com.example.runner.ui.MainActivity
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -34,6 +35,10 @@ import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.LatLng
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 typealias polyline=MutableList<LatLng>
@@ -44,15 +49,20 @@ class TrackingService: LifecycleService() {
 
     lateinit var fusedLocationProviderClient: FusedLocationProviderClient
 
+    //this is for updating the notifications because the notifications should not be updated that much frequently
+    private val timeRunSeconds = MutableLiveData<Long>()
+
     companion object{
+
+        //this time is for updating on the screen
+        val timeRunInMillis=MutableLiveData<Long>()
         val isTracking=MutableLiveData<Boolean>()
-
         val pathPoints = MutableLiveData<polylines>()
-
     }
 
     private fun postInitialValues(){
-
+        timeRunSeconds.postValue(0L)
+        timeRunInMillis.postValue(0L)
         isTracking.postValue(false)
         pathPoints.postValue(mutableListOf())
     }
@@ -77,7 +87,7 @@ class TrackingService: LifecycleService() {
                         isFirstRun=false
                     }else{
                         Timber.d("Resuming service")
-                        startForegroundService()
+                        startTimer()
                     }
                 }
                 ACTION_PAUSE_SERVICE->{
@@ -93,8 +103,56 @@ class TrackingService: LifecycleService() {
     }
 
 
+    var isTimerEnabled=false
+
+    //this variable is for storing the time when user starts and pause the run
+    private var lapTime=0L
+
+    //variable for total time
+    private var timeRun=0L
+
+    private var timeStarted=0L
+    private var lastSecondTimestamp=0L
+
+
+    //function for starting the timer
+    private fun startTimer(){
+
+        //we shifted this from startForegroundservice because we need to add empty lines
+        //when the user starts first time or starts again after stopping
+        //in the startForeground service it will not stop until run is complete
+        addEmptyPolyline()
+
+        isTracking.postValue(true)
+        timeStarted=System.currentTimeMillis()
+        isTimerEnabled=true
+
+        CoroutineScope(Dispatchers.Main).launch{
+            while (isTracking.value!!){
+                //time difference between now and timestarted
+                lapTime=System.currentTimeMillis()-timeStarted
+
+                //post the new lap time
+                timeRunInMillis.postValue(timeRun+lapTime)
+
+                //so what this does is if the lastsecondtimestamp increases by 1 sec
+                //means the value of timeruninmillis will be less
+                //so we update seconds time and the timestamp
+                if(timeRunInMillis.value!! >= lastSecondTimestamp+1000L){
+                    timeRunSeconds.postValue(timeRunSeconds.value!! + 1)
+                    lastSecondTimestamp += 1000L
+                }
+                delay(TIMER_UPDATER_INTERVAL)
+            }
+            //add the last lap time to our totaltime
+            timeRun += lapTime
+        }
+    }
+
+    //function to pause the service when the user clicks on stop button
     private fun pauseService(){
         isTracking.postValue(false)
+        isTimerEnabled=false
     }
 
     //what this functions does is if the tracking is true
@@ -174,8 +232,7 @@ class TrackingService: LifecycleService() {
 
 
     private fun startForegroundService(){
-
-        addEmptyPolyline()
+        startTimer()
         isTracking.postValue(true)
         val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 

@@ -11,16 +11,24 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
+import androidx.navigation.fragment.findNavController
 import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_SHOW_TRACKING_FRAGMENT
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
+import com.example.runner.OTHER.Constants.ACTION_STOP_SERVICE
 import com.example.runner.OTHER.Constants.MAP_ZOOM
 import com.example.runner.OTHER.Constants.POLYLINE_COLOR
 import com.example.runner.OTHER.Constants.POLYLINE_WIDTH
@@ -38,7 +46,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class TrackingFragment : Fragment(R.layout.fragment_tracking) {
+class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     private val viewModel: MainViewModel by viewModels()
     private lateinit var binding: FragmentTrackingBinding
@@ -49,6 +57,8 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
     private var map: GoogleMap? = null
 
     private var currentTimeMillis=0L
+
+    private var menu: Menu?=null
 
     var hasNotificationPermissionGranted = false
 
@@ -109,7 +119,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
             map = it
             addAllPolyline()
         }
-
+        activity?.addMenuProvider(this)
         subscribeToObservers()
     }
 
@@ -162,6 +172,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
     private fun toggleRun(){
 
         if(isTracking){
+            menu?.getItem(0)?.isVisible=true
             sendCommandToService(ACTION_PAUSE_SERVICE)
         }else{
             sendCommandToService(ACTION_START_OR_RESUME_SERVICE)
@@ -179,6 +190,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         }else{
             binding.btnToggleRun.text="Stop"
             binding.btnFinishRun.visibility=View.GONE
+            menu?.getItem(0)?.isVisible=true
         }
     }
 
@@ -234,12 +246,15 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         binding.mapView.onSaveInstanceState(outState)
     }
 
+
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
         binding = FragmentTrackingBinding.inflate(layoutInflater)
+
         if (!NotificationManagerCompat.from(requireContext()).areNotificationsEnabled()) {
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -250,5 +265,53 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
             hasNotificationPermissionGranted = true
         }
         return binding.root
+    }
+
+
+    private fun showCancelTrackingDialog(){
+
+        val dialog=MaterialAlertDialogBuilder(requireContext(),R.style.AlertDialogTheme)
+            .setTitle("Cancel the run")
+            .setMessage("Are you sure you want to cancel the run?")
+            .setIcon(R.drawable.ic_delete_black)
+            .setPositiveButton("yes"){_,_->
+                stopRun()
+            }
+            .setNegativeButton("No"){dialogInterface,_->
+                dialogInterface.cancel()
+            }
+            .create()
+
+        dialog.show()
+    }
+
+    private fun stopRun(){
+        sendCommandToService(ACTION_STOP_SERVICE)
+        menu?.clear()
+        findNavController().navigate(R.id.action_trackingFragment_to_runFragment)
+    }
+
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+        menuInflater.inflate(R.menu.toolbar_tracking_menu,menu)
+        this.menu=menu
+    }
+
+    override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
+        return when (menuItem.itemId) {
+            R.id.cancelTracking->{
+                showCancelTrackingDialog()
+                true
+            }
+            else -> {
+                false
+            }
+        }
+    }
+
+    override fun onPrepareMenu(menu: Menu) {
+        super.onPrepareMenu(menu)
+        if (currentTimeMillis>0L){
+            menu.getItem(0)?.isVisible=true
+        }
     }
 }

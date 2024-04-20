@@ -5,9 +5,13 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.navigation.fragment.findNavController
@@ -19,7 +23,7 @@ import dagger.hilt.android.AndroidEntryPoint
 
 
 @AndroidEntryPoint
-class RunFragment : Fragment(R.layout.fragment_run) {
+class RunFragment : Fragment(R.layout.fragment_run){
 
     private val viewModel: MainViewModel by viewModels()
     private lateinit var binding: FragmentRunBinding
@@ -84,5 +88,7 @@ class RunFragment : Fragment(R.layout.fragment_run) {
     private fun startLocationPermissionRequest(permission: String) {
         req.launch(permission)
     }
+
+
 
 }

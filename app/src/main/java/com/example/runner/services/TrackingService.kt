@@ -52,6 +52,7 @@ typealias polylines=MutableList<polyline>
 class TrackingService: LifecycleService() {
 
     var isFirstRun=true
+    var serviceKilled=false
 
     @Inject
     lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -110,6 +111,7 @@ class TrackingService: LifecycleService() {
                 }
                 ACTION_STOP_SERVICE->{
                     Timber.d("stopped service")
+                    killService()
                 }
             }
         }
@@ -257,10 +259,12 @@ class TrackingService: LifecycleService() {
         notificationManager.notify(NOTIFICATION_ID,baseNotificationBuilder.build())
 
         timeRunSeconds.observe(this, Observer {
-            val notification=currentNotificationBuilder
-                .setContentText(TrackingUtility.getFormattedStopWatchTime(it*1000L))
+            if(!serviceKilled){
+                val notification=currentNotificationBuilder
+                    .setContentText(TrackingUtility.getFormattedStopWatchTime(it*1000L))
 
-            notificationManager.notify(NOTIFICATION_ID,notification.build())
+                notificationManager.notify(NOTIFICATION_ID,notification.build())
+            }
         })
     }
 
@@ -272,7 +276,7 @@ class TrackingService: LifecycleService() {
         val channel=NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             NOTIFICATION_CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_LOW
         )
         notificationManager.createNotificationChannel(channel)
     }
@@ -301,10 +305,22 @@ class TrackingService: LifecycleService() {
             set(currentNotificationBuilder, ArrayList<NotificationCompat.Action>())
         }
 
-        currentNotificationBuilder=baseNotificationBuilder
-            .addAction(R.drawable.ic_pause_black,notificationActionText,pendingIntent)
+        if(!serviceKilled){
+            currentNotificationBuilder=baseNotificationBuilder
+                .addAction(R.drawable.ic_pause_black,notificationActionText,pendingIntent)
 
-        notificationManager.notify(NOTIFICATION_ID,currentNotificationBuilder.build())
+            notificationManager.notify(NOTIFICATION_ID,currentNotificationBuilder.build())
+        }
+    }
 
+
+    private fun killService(){
+        serviceKilled=true
+        isFirstRun=true
+        pauseService()
+        postInitialValues()
+        val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(NOTIFICATION_ID)
+        stopSelf()
     }
 }

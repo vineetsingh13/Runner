@@ -17,14 +17,22 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
+import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_SHOW_TRACKING_FRAGMENT
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
+import com.example.runner.OTHER.Constants.MAP_ZOOM
+import com.example.runner.OTHER.Constants.POLYLINE_COLOR
+import com.example.runner.OTHER.Constants.POLYLINE_WIDTH
 import com.example.runner.R
 import com.example.runner.databinding.FragmentTrackingBinding
 import com.example.runner.services.TrackingService
+import com.example.runner.services.polyline
 import com.example.runner.ui.MainActivity
 import com.example.runner.ui.viewModels.MainViewModel
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -33,6 +41,9 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
 
     private val viewModel: MainViewModel by viewModels()
     private lateinit var binding: FragmentTrackingBinding
+    private var isTracking=false
+
+    private var pathPoints= mutableListOf<polyline>()
 
     private var map: GoogleMap? = null
 
@@ -87,12 +98,94 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking) {
         binding.mapView.onCreate(savedInstanceState)
 
         binding.btnToggleRun.setOnClickListener {
-            sendCommandToService(ACTION_START_OR_RESUME_SERVICE)
+            toggleRun()
         }
 
 
         binding.mapView.getMapAsync {
             map = it
+            addAllPolyline()
+        }
+
+        subscribeToObservers()
+    }
+
+    private fun moveCameraToUser(){
+        if(pathPoints.isNotEmpty() && pathPoints.last().isNotEmpty()){
+            map?.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    pathPoints.last().last(),
+                    MAP_ZOOM
+                )
+            )
+        }
+    }
+
+
+    //THIS FUNCTION IS FOR DRAWING THE LINE ON THE MAP
+    private fun addAllPolyline(){
+        for(polyline in pathPoints){
+
+            val polylineOptions=PolylineOptions()
+                .color(POLYLINE_COLOR)
+                .width(POLYLINE_WIDTH)
+                .addAll(polyline)
+
+            map?.addPolyline(polylineOptions)
+        }
+    }
+
+
+
+    private fun subscribeToObservers(){
+        TrackingService.isTracking.observe(viewLifecycleOwner, Observer {
+            updateTracking(it)
+        })
+
+        TrackingService.pathPoints.observe(viewLifecycleOwner, Observer {
+            pathPoints=it
+            addLatestPolyline()
+            moveCameraToUser()
+        })
+    }
+
+
+    private fun toggleRun(){
+
+        if(isTracking){
+            sendCommandToService(ACTION_PAUSE_SERVICE)
+        }else{
+            sendCommandToService(ACTION_START_OR_RESUME_SERVICE)
+        }
+    }
+
+
+    //function for updating the ui
+    private fun updateTracking(isTracking:Boolean){
+        this.isTracking=isTracking
+
+        if(!isTracking){
+            binding.btnToggleRun.text="Start"
+            binding.btnFinishRun.visibility=View.VISIBLE
+        }else{
+            binding.btnToggleRun.text="Stop"
+            binding.btnFinishRun.visibility=View.GONE
+        }
+    }
+
+    //THIS FUNCTION IS FOR DRAWING THE LINE ON MAP
+    private fun addLatestPolyline(){
+        if(pathPoints.isNotEmpty() && pathPoints.last().size>1){
+            val preLastLatLng=pathPoints.last()[pathPoints.last().size-2]
+            val lastLatLng = pathPoints.last().last()
+
+            val polylineOptions=PolylineOptions()
+                .color(POLYLINE_COLOR)
+                .width(POLYLINE_WIDTH)
+                .add(preLastLatLng)
+                .add(lastLatLng)
+
+            map?.addPolyline(polylineOptions)
         }
     }
 

@@ -1,9 +1,12 @@
 package com.example.runner.ui.viewModels
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.runner.db.run
 import com.example.runner.repositories.MainRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.scopes.ViewModelScoped
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 //the job of viewModel is to collect the data from the MainRepository and provide to all the fragments and UI COMPONENTS THAT NEED IT
@@ -16,4 +19,9 @@ class MainViewModel @Inject constructor(
     val mainRepository: MainRepository
 ): ViewModel() {
 
+    fun insertRun(run: run) = viewModelScope.launch {
+        mainRepository.insertRun(run)
+    }
+
+    val runSortedByDate=mainRepository.getAllRunsSortedByDate()
 }

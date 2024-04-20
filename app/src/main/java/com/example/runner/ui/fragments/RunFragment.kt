@@ -14,8 +14,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
+import androidx.lifecycle.Observer
 import androidx.navigation.fragment.findNavController
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.runner.R
+import com.example.runner.adapters.RunAdapter
 import com.example.runner.databinding.FragmentRunBinding
 import com.example.runner.ui.viewModels.MainViewModel
 
@@ -26,6 +29,7 @@ import dagger.hilt.android.AndroidEntryPoint
 class RunFragment : Fragment(R.layout.fragment_run){
 
     private val viewModel: MainViewModel by viewModels()
+    private lateinit var runAdapter: RunAdapter
     private lateinit var binding: FragmentRunBinding
 
     private val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -59,10 +63,15 @@ class RunFragment : Fragment(R.layout.fragment_run){
         }
     }
 
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        setupRecyclerView()
 
+        viewModel.runSortedByDate.observe(viewLifecycleOwner, Observer {
+            runAdapter.submitList(it)
+        })
 
         binding.fab.setOnClickListener {
             findNavController().navigate(R.id.action_runFragment_to_trackingFragment)
@@ -89,6 +98,10 @@ class RunFragment : Fragment(R.layout.fragment_run){
         req.launch(permission)
     }
 
-
+    private fun setupRecyclerView()=binding.rvRuns.apply {
+        runAdapter=RunAdapter()
+        adapter=runAdapter
+        layoutManager=LinearLayoutManager(requireContext())
+    }
 
 }

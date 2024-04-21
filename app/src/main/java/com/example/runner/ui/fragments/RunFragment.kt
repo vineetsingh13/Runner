@@ -1,6 +1,7 @@
 package com.example.runner.ui.fragments
 
 import android.Manifest
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -18,19 +19,30 @@ import androidx.fragment.app.viewModels
 import androidx.lifecycle.Observer
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.runner.OTHER.Constants.KEY_NAME
 import com.example.runner.OTHER.SortType
 import com.example.runner.R
 import com.example.runner.adapters.RunAdapter
 import com.example.runner.databinding.FragmentRunBinding
 import com.example.runner.ui.viewModels.MainViewModel
+import com.google.android.material.textview.MaterialTextView
 
 import dagger.hilt.android.AndroidEntryPoint
+import timber.log.Timber
+import javax.inject.Inject
 
 
 @AndroidEntryPoint
 class RunFragment : Fragment(R.layout.fragment_run){
 
     private val viewModel: MainViewModel by viewModels()
+
+    @Inject
+    lateinit var sharedPref: SharedPreferences
+
+    @Inject
+    lateinit var name: String
+
     private lateinit var runAdapter: RunAdapter
     private lateinit var binding: FragmentRunBinding
 
@@ -70,6 +82,9 @@ class RunFragment : Fragment(R.layout.fragment_run){
         super.onViewCreated(view, savedInstanceState)
 
         setupRecyclerView()
+        Log.d("NAMES",name)
+        val toolbarText = "Let's go, $name!"
+        requireActivity().findViewById<MaterialTextView>(R.id.tvToolbarTitle).text = toolbarText
 
         when(viewModel.sortType){
             SortType.DATE -> binding.spFilter.setSelection(0)

@@ -6,10 +6,12 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_UPDATE_CURRENT
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
@@ -29,6 +31,7 @@ import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_SHOW_TRACKING_FRAGMENT
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_STOP_SERVICE
+import com.example.runner.OTHER.Constants.KEY_WEIGHT
 import com.example.runner.OTHER.Constants.MAP_ZOOM
 import com.example.runner.OTHER.Constants.POLYLINE_COLOR
 import com.example.runner.OTHER.Constants.POLYLINE_WIDTH
@@ -49,6 +52,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Calendar
+import javax.inject.Inject
 import kotlin.math.round
 
 @AndroidEntryPoint
@@ -58,6 +62,9 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     private lateinit var binding: FragmentTrackingBinding
     private var isTracking=false
 
+    @Inject
+    lateinit var sharedPref: SharedPreferences
+
     private var pathPoints= mutableListOf<polyline>()
 
     private var map: GoogleMap? = null
@@ -66,7 +73,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     private var menu: Menu?=null
 
-    private var weight=80f
+    var weight=80f
 
     var hasNotificationPermissionGranted = false
 
@@ -122,6 +129,8 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
             toggleRun()
         }
 
+        weight=sharedPref.getFloat(KEY_WEIGHT,80f)
+        Log.d("WEIGHT", weight.toString())
 
         binding.mapView.getMapAsync {
             map = it

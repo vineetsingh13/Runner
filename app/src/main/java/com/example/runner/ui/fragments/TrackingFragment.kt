@@ -55,6 +55,7 @@ import java.util.Calendar
 import javax.inject.Inject
 import kotlin.math.round
 
+const val CANCEL_TRACKING_DIALOG="CANCELDIALOG"
 @AndroidEntryPoint
 class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
@@ -129,6 +130,13 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
             toggleRun()
         }
 
+        if (savedInstanceState!=null){
+            val cancelTrackingDialog=parentFragmentManager.findFragmentByTag(CANCEL_TRACKING_DIALOG) as CancelTrackingDialog?
+
+            cancelTrackingDialog?.setYesListener {
+                stopRun()
+            }
+        }
         weight=sharedPref.getFloat(KEY_WEIGHT,80f)
         Log.d("WEIGHT", weight.toString())
 
@@ -207,10 +215,10 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     private fun updateTracking(isTracking:Boolean){
         this.isTracking=isTracking
 
-        if(!isTracking){
+        if(!isTracking && currentTimeMillis>0L){
             binding.btnToggleRun.text="Start"
             binding.btnFinishRun.visibility=View.VISIBLE
-        }else{
+        }else if(isTracking){
             binding.btnToggleRun.text="Stop"
             binding.btnFinishRun.visibility=View.GONE
             menu?.getItem(0)?.isVisible=true
@@ -293,22 +301,15 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     private fun showCancelTrackingDialog(){
 
-        val dialog=MaterialAlertDialogBuilder(requireContext(),R.style.AlertDialogTheme)
-            .setTitle("Cancel the run")
-            .setMessage("Are you sure you want to cancel the run?")
-            .setIcon(R.drawable.ic_delete_black)
-            .setPositiveButton("yes"){_,_->
+        CancelTrackingDialog().apply {
+            setYesListener {
                 stopRun()
             }
-            .setNegativeButton("No"){dialogInterface,_->
-                dialogInterface.cancel()
-            }
-            .create()
-
-        dialog.show()
+        }.show(parentFragmentManager, CANCEL_TRACKING_DIALOG)
     }
 
     private fun stopRun(){
+        binding.tvTimer.text="00:00:00:00"
         sendCommandToService(ACTION_STOP_SERVICE)
         menu?.clear()
         findNavController().navigate(R.id.action_trackingFragment_to_runFragment)

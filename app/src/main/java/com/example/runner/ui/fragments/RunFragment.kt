@@ -40,7 +40,7 @@ class RunFragment : Fragment(R.layout.fragment_run){
     @Inject
     lateinit var sharedPref: SharedPreferences
 
-    @Inject
+
     lateinit var name: String
 
     private lateinit var runAdapter: RunAdapter
@@ -129,6 +129,7 @@ class RunFragment : Fragment(R.layout.fragment_run){
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        name= sharedPref.getString(KEY_NAME,"").toString()
         startLocationPermissionRequest(permissions[permissionIndex])
     }
 

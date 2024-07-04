@@ -49,36 +49,36 @@ class RunFragment : Fragment(R.layout.fragment_run){
     private lateinit var runAdapter: RunAdapter
     private lateinit var binding: FragmentRunBinding
 
-//    private val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//
-//        arrayOf(
-//            Manifest.permission.ACCESS_FINE_LOCATION,
-//            Manifest.permission.ACCESS_COARSE_LOCATION,
-//            //Manifest.permission.ACCESS_BACKGROUND_LOCATION
-//        )
-//
-//    } else {
-//        arrayOf(
-//            Manifest.permission.ACCESS_FINE_LOCATION,
-//            Manifest.permission.ACCESS_COARSE_LOCATION,
-//        )
-//    }
+    /*private val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 
-//    private var permissionIndex = 0
-//    val req = registerForActivityResult(
-//        ActivityResultContracts.RequestPermission()
-//    ) { isGranted ->
-//        if (isGranted) {
-//            Log.e("permissions", "not granted")
-//            Log.e("permissions", "${permissions[permissionIndex]} granted")
-//            permissionIndex++
-//            if (permissionIndex < permissions.size) {
-//                startLocationPermissionRequest(permissions[permissionIndex])
-//            }
-//        } else {
-//            Log.e("permissions", "${permissions[permissionIndex]} not granted")
-//        }
-//    }
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            //Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        )
+
+    } else {
+        arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        )
+    }
+
+    private var permissionIndex = 0
+    val req = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.e("permissions", "not granted")
+            Log.e("permissions", "${permissions[permissionIndex]} granted")
+            permissionIndex++
+            if (permissionIndex < permissions.size) {
+                startLocationPermissionRequest(permissions[permissionIndex])
+            }
+        } else {
+            Log.e("permissions", "${permissions[permissionIndex]} not granted")
+        }
+    }*/
 
 
 
@@ -134,7 +134,6 @@ class RunFragment : Fragment(R.layout.fragment_run){
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         name= sharedPref.getString(KEY_NAME,"").toString()
-        //startLocationPermissionRequest(permissions[permissionIndex])
 
     }
 
@@ -149,10 +148,6 @@ class RunFragment : Fragment(R.layout.fragment_run){
         return binding.root
     }
 
-//    private fun startLocationPermissionRequest(permission: String) {
-//        req.launch(permission)
-//    }
-
 
     private fun setupRecyclerView()=binding.rvRuns.apply {
         runAdapter=RunAdapter()
@@ -161,23 +156,5 @@ class RunFragment : Fragment(R.layout.fragment_run){
     }
 
 
-    private fun requestPermission(){
-        when{
-            ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )==PackageManager.PERMISSION_GRANTED->{
 
-            }
-            ActivityCompat.shouldShowRequestPermissionRationale(
-                requireActivity(),
-                Manifest.permission.ACCESS_FINE_LOCATION
-            )->{
-                requestPermission()
-            }
-            else->{
-
-            }
-        }
-    }
 }

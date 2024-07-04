@@ -7,4 +7,7 @@
         <item>Average Speed</item>
         <item>Calories Burned</item>
     </string-array>
+    <string name="permissionExplain">
+        Location permission is needed for the app to run. It is the main functionality and without it the app won\'t work. Please grant permission from settings for the app to provide you the best experience.
+    </string>
 </resources>

@@ -11,5 +11,7 @@ class BaseApplication:Application() {
         super.onCreate()
 
         Timber.plant(Timber.DebugTree())
+
+
     }
 }

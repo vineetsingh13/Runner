@@ -2,6 +2,7 @@ package com.example.runner.ui.fragments
 
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -63,18 +64,23 @@ class StatisticsFragment: Fragment(R.layout.fragment_statistics) {
         })
 
         viewModel.runSortedByDate.observe(viewLifecycleOwner, Observer {
-            it?.let {
-                val avgSpeed=it.indices.map { i->BarEntry(i.toFloat(),it[i].avgSpeed) }
-
-                val bardataset=BarDataSet(avgSpeed,"Avg Speed Over Time").apply {
+            it?.let { runs->
+                val distance=it.indices.map { i->BarEntry(i.toFloat(),it[i].distanceMeters.toFloat()/1000) }
+                Log.d("barchart",distance.toString())
+                val bardataset=BarDataSet(distance,"All distances").apply {
                     valueTextColor=Color.WHITE
-                    color=ContextCompat.getColor(requireContext(),R.color.colorAccent)
+                    color=ContextCompat.getColor(requireContext(),R.color.active_green)
 
                 }
 
                 binding.barChart.data= BarData(bardataset)
-                binding.barChart.marker=CustomMarkerView(it.reversed(),requireContext(),R.layout.marker_view)
+                binding.barChart.axisRight.isEnabled=false
+                binding.barChart.animateX(1000)
+                binding.barChart.barData.barWidth=0.2f
+                binding.barChart.marker=CustomMarkerView(it,requireContext(),R.layout.marker_view)
                 binding.barChart.invalidate()
+
+
 
             }
         })
@@ -109,6 +115,7 @@ class StatisticsFragment: Fragment(R.layout.fragment_statistics) {
         binding.barChart.axisLeft.apply {
             axisLineColor=Color.WHITE
             textColor=Color.WHITE
+            textSize=8f
             setDrawGridLines(false)
         }
 
@@ -119,7 +126,7 @@ class StatisticsFragment: Fragment(R.layout.fragment_statistics) {
         }
 
         binding.barChart.apply {
-            description.text="Avg Speed Over Time"
+            //description.text="Avg Speed Over Time"
             legend.isEnabled=false
         }
     }

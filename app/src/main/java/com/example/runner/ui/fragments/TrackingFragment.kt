@@ -1,12 +1,11 @@
 package com.example.runner.ui.fragments
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.PendingIntent.FLAG_UPDATE_CURRENT
+import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -20,37 +19,44 @@ import android.view.View
 import android.view.ViewGroup
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.view.MenuHost
+import androidx.core.content.ContextCompat
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
-import com.example.runner.OTHER.Constants.ACTION_SHOW_TRACKING_FRAGMENT
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_STOP_SERVICE
 import com.example.runner.OTHER.Constants.KEY_WEIGHT
 import com.example.runner.OTHER.Constants.MAP_ZOOM
 import com.example.runner.OTHER.Constants.POLYLINE_COLOR
 import com.example.runner.OTHER.Constants.POLYLINE_WIDTH
+import com.example.runner.OTHER.TrackingSingleton
 import com.example.runner.OTHER.TrackingUtility
+import com.example.runner.OTHER.polyline
 import com.example.runner.R
 import com.example.runner.databinding.FragmentTrackingBinding
 import com.example.runner.services.TrackingService
-import com.example.runner.services.polyline
 import com.example.runner.ui.MainActivity
 import com.example.runner.ui.viewModels.MainViewModel
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.MapView
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.LatLngBounds
+import com.google.android.gms.maps.model.MapStyleOptions
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
 import kotlin.math.round
@@ -60,15 +66,21 @@ const val CANCEL_TRACKING_DIALOG="CANCELDIALOG"
 class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     private val viewModel: MainViewModel by viewModels()
+
     private lateinit var binding: FragmentTrackingBinding
     private var isTracking=false
+    private var currentLocationMarker: Marker? = null
+    private var startLocation: LatLng? = null
+
+    lateinit var fusedlocationprovider: FusedLocationProviderClient
 
     @Inject
     lateinit var sharedPref: SharedPreferences
 
-    private var pathPoints= mutableListOf<polyline>()
+    //private var pathPoints= mutableListOf<polyline>()
 
     private var map: GoogleMap? = null
+
 
     private var currentTimeMillis=0L
 
@@ -77,6 +89,8 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     var weight=80f
 
     var hasNotificationPermissionGranted = false
+
+    private var hasZoomedToUserOnce=false
 
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -125,10 +139,13 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         super.onViewCreated(view, savedInstanceState)
 
         binding.mapView.onCreate(savedInstanceState)
+        //isTracking = savedInstanceState?.getBoolean("isTracking") ?: false
 
         binding.btnToggleRun.setOnClickListener {
+            //drawCompletePath()
             toggleRun()
         }
+
 
         if (savedInstanceState!=null){
             val cancelTrackingDialog=parentFragmentManager.findFragmentByTag(CANCEL_TRACKING_DIALOG) as CancelTrackingDialog?
@@ -140,12 +157,16 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         weight=sharedPref.getFloat(KEY_WEIGHT,80f)
         Log.d("WEIGHT", weight.toString())
 
+
         binding.mapView.getMapAsync {
             map = it
+            map!!.setMapStyle(MapStyleOptions.loadRawResourceStyle(requireContext(),R.raw.style_json))
             addAllPolyline()
+            moveToUserBeforeStartingRun()
         }
 
         binding.btnFinishRun.setOnClickListener {
+            TrackingSingleton.allPath.add(TrackingSingleton.pathPoints.value!!)
             zoomToSeeWholeTrack()
             endRunAndSavetoDb()
         }
@@ -155,10 +176,10 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     }
 
     private fun moveCameraToUser(){
-        if(pathPoints.isNotEmpty() && pathPoints.last().isNotEmpty()){
+        if(TrackingSingleton.pathPoints.value!!.isNotEmpty() && TrackingSingleton.pathPoints.value!!.last().isNotEmpty()){
             map?.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(
-                    pathPoints.last().last(),
+                    TrackingSingleton.pathPoints.value!!.last().last(),
                     MAP_ZOOM
                 )
             )
@@ -168,34 +189,41 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     //THIS FUNCTION IS FOR DRAWING THE LINE ON THE MAP
     private fun addAllPolyline(){
-        for(polyline in pathPoints){
+        if(isTracking && TrackingSingleton.pathPoints.value!!.size>=1){
+            for(polyline in TrackingSingleton.pathPoints.value!!){
 
-            val polylineOptions=PolylineOptions()
-                .color(POLYLINE_COLOR)
-                .width(POLYLINE_WIDTH)
-                .addAll(polyline)
+                val polylineOptions=PolylineOptions()
+                    .color(POLYLINE_COLOR)
+                    .width(POLYLINE_WIDTH)
+                    .addAll(polyline)
 
-            map?.addPolyline(polylineOptions)
+                map?.addPolyline(polylineOptions)
+            }
         }
     }
 
 
 
     private fun subscribeToObservers(){
-        TrackingService.isTracking.observe(viewLifecycleOwner, Observer {
-            updateTracking(it)
-        })
 
-        TrackingService.pathPoints.observe(viewLifecycleOwner, Observer {
-            pathPoints=it
+
+        lifecycleScope.launch {
+            TrackingService.isTracking.collect{ isTracking ->
+                updateTracking(isTracking)
+            }
+        }
+
+        TrackingSingleton.pathPoints.observe(viewLifecycleOwner, Observer {
+            //pathPoints=it
             addLatestPolyline()
             moveCameraToUser()
         })
 
-        TrackingService.timeRunInMillis.observe(viewLifecycleOwner, Observer {
+        TrackingSingleton.timeRunInMillis.observe(viewLifecycleOwner, Observer {
             currentTimeMillis=it
             val formattedTime=TrackingUtility.getFormattedStopWatchTime(currentTimeMillis,true)
             binding.tvTimer.text=formattedTime
+
         })
     }
 
@@ -205,6 +233,9 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         if(isTracking){
             menu?.getItem(0)?.isVisible=true
             sendCommandToService(ACTION_PAUSE_SERVICE)
+            TrackingSingleton.allPath.add(TrackingSingleton.pathPoints.value!!)
+
+            Log.d("ALLPATH", TrackingSingleton.allPath.toString())
         }else{
             sendCommandToService(ACTION_START_OR_RESUME_SERVICE)
         }
@@ -218,6 +249,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         if(!isTracking && currentTimeMillis>0L){
             binding.btnToggleRun.text="Start"
             binding.btnFinishRun.visibility=View.VISIBLE
+            //drawCompletePath()
         }else if(isTracking){
             binding.btnToggleRun.text="Stop"
             binding.btnFinishRun.visibility=View.GONE
@@ -227,9 +259,18 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     //THIS FUNCTION IS FOR DRAWING THE LINE ON MAP
     private fun addLatestPolyline(){
-        if(pathPoints.isNotEmpty() && pathPoints.last().size>1){
-            val preLastLatLng=pathPoints.last()[pathPoints.last().size-2]
-            val lastLatLng = pathPoints.last().last()
+        if(TrackingSingleton.pathPoints.value!!.isNotEmpty() && TrackingSingleton.pathPoints.value!!.last().size>1){
+            val preLastLatLng=TrackingSingleton.pathPoints.value!!.last()[TrackingSingleton.pathPoints.value!!.last().size-2]
+            val lastLatLng = TrackingSingleton.pathPoints.value!!.last().last()
+
+
+            if (startLocation == null) {
+                startLocation = TrackingSingleton.pathPoints.value!!.last()[0]
+                Log.d("start locaiton",startLocation.toString())
+                //map?.addMarker(MarkerOptions().position(startLocation!!).title("Start").icon(bitmapDescriptorFromVector(requireContext(), R.drawable.flag)))
+                addStartMarker(startLocation!!)
+            }
+            addOrUpdateMarker(lastLatLng)
 
             val polylineOptions=PolylineOptions()
                 .color(POLYLINE_COLOR)
@@ -249,16 +290,39 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
     override fun onResume() {
         super.onResume()
+
+
         binding.mapView.onResume()
+    }
+
+
+    private fun drawCompletePath(path: MutableList<polyline>) {
+        Log.d("RESUME", "RESUME CALLED")
+
+        val polylineOptions = PolylineOptions()
+            .color(POLYLINE_COLOR)
+            .width(POLYLINE_WIDTH)
+
+        for (point in path) {
+            for(coordinates in point){
+                polylineOptions.add(coordinates)
+            }
+        }
+
+        map!!.addPolyline(polylineOptions)
     }
 
     override fun onStart() {
         super.onStart()
+        if(TrackingSingleton.isRunOn.value==true){
+            drawCompletePath(TrackingSingleton.pathPoints.value!!)
+        }
         binding.mapView.onStart()
     }
 
     override fun onStop() {
         super.onStop()
+        //drawCompletePath()
         binding.mapView.onStop()
     }
 
@@ -275,6 +339,7 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         binding.mapView.onSaveInstanceState(outState)
+        //outState.putBoolean("isTracking", isTracking)
     }
 
 
@@ -295,7 +360,16 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         }else{
             hasNotificationPermissionGranted = true
         }
+
+        (activity as MainActivity).binding.cardView.visibility=View.GONE
+
         return binding.root
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        (activity as MainActivity).binding.cardView.visibility=View.VISIBLE
+        hasZoomedToUserOnce=false
     }
 
 
@@ -312,6 +386,10 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
         binding.tvTimer.text="00:00:00:00"
         sendCommandToService(ACTION_STOP_SERVICE)
         menu?.clear()
+        TrackingSingleton.allPath.clear()
+        TrackingSingleton.pathPoints.value?.clear()
+        TrackingSingleton.isRunOn.postValue(false)
+        TrackingSingleton.timeRunInMillis.postValue(0L)
         findNavController().navigate(R.id.action_trackingFragment_to_runFragment)
     }
 
@@ -344,29 +422,45 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
     private fun zoomToSeeWholeTrack(){
         val bounds=LatLngBounds.builder()
 
-        for(polyline in pathPoints){
-
-            for(pos in polyline){
-                bounds.include(pos)
+        for (polylines in TrackingSingleton.allPath) {
+            // Iterate through each polyline in the current polylines
+            for (polyline in polylines) {
+                // Iterate through each position in the current polyline
+                for (pos in polyline) {
+                    bounds.include(pos)
+                }
             }
         }
 
+
+        //val padding = (minOf(binding.mapView.width, binding.mapView.height) * 0.1f).toInt()
+        val width = resources.displayMetrics.widthPixels
+        val height=resources.displayMetrics.heightPixels
+        val padding = (height * 0.25).toInt()
+
         map?.moveCamera(
             CameraUpdateFactory.newLatLngBounds(
-                bounds.build(),
-                binding.mapView.width,
-                binding.mapView.height,
-                (binding.mapView.height*0.05f).toInt()
+                bounds.build(),padding
             )
         )
     }
 
     private fun endRunAndSavetoDb(){
-        map?.snapshot { bmp->
 
+        if(startLocation!=null){
+            map?.addMarker(MarkerOptions().position(startLocation!!).title("Start").icon(bitmapDescriptorFromVector(requireContext(), R.drawable.flag)))
+        }
+
+        Log.d("start location",startLocation.toString())
+        map?.snapshot { bmp->
             var distanceInMeters=0
-            for(polyline in pathPoints){
-                distanceInMeters+=TrackingUtility.calculatePolylineLength(polyline).toInt()
+
+            for (polylines in TrackingSingleton.allPath) {
+                // Iterate through each polyline in the current polylines
+                for (polyline in polylines) {
+                    // Iterate through each position in the current polyline
+                    distanceInMeters+=TrackingUtility.calculatePolylineLength(polyline).toInt()
+                }
             }
 
             val avgSpeed = round((distanceInMeters/1000f) / (currentTimeMillis/1000f/60/60) * 10)/10f
@@ -392,5 +486,69 @@ class TrackingFragment : Fragment(R.layout.fragment_tracking),MenuProvider {
 
             stopRun()
         }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun moveToUserBeforeStartingRun(){
+
+        if (hasZoomedToUserOnce) return
+
+        fusedlocationprovider = LocationServices.getFusedLocationProviderClient(requireContext())
+
+        fusedlocationprovider.lastLocation.addOnSuccessListener { location->
+
+            location.let {
+
+                val latlng=LatLng(location.latitude,location.longitude)
+                addOrUpdateMarker(latlng)
+                map?.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        latlng,
+                        MAP_ZOOM
+                    )
+                )
+
+                hasZoomedToUserOnce = true
+            }
+        }
+
+    }
+
+    private fun addOrUpdateMarker(position: LatLng) {
+        if (currentLocationMarker == null) {
+            // Add a new marker if it doesn’t exist yet
+            val customIcon = bitmapDescriptorFromVector(requireContext(), R.drawable.location)
+            currentLocationMarker = map!!.addMarker(
+                MarkerOptions()
+                    .position(position)
+                    .title("Current Location")
+                    .icon(customIcon)
+            )
+        } else {
+            // Update the marker's position
+            currentLocationMarker?.position = position
+        }
+    }
+
+    private fun bitmapDescriptorFromVector(context: Context, drawableId: Int): BitmapDescriptor {
+        val vectorDrawable = ContextCompat.getDrawable(context, drawableId)
+        vectorDrawable?.setBounds(0, 0, vectorDrawable.intrinsicWidth, vectorDrawable.intrinsicHeight)
+        val width = 110
+        val height = 110
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        vectorDrawable?.setBounds(0, 0, canvas.width, canvas.height)
+        vectorDrawable?.draw(canvas)
+        return BitmapDescriptorFactory.fromBitmap(bitmap)
+    }
+
+    private fun addStartMarker(position: LatLng) {
+        val startIcon = bitmapDescriptorFromVector(requireContext(), R.drawable.flag) // Customize as needed
+        map?.addMarker(
+            MarkerOptions()
+                .position(position)
+                .title("Start Location")
+                .icon(startIcon)
+        )
     }
 }

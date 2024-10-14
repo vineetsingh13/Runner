@@ -104,6 +104,10 @@ dependencies {
 
     implementation("com.google.dagger:hilt-android:2.48")
     ksp("com.google.dagger:hilt-android-compiler:2.48")
+
+
+
+    implementation("com.google.code.gson:gson:2.11.0")
     
 
 }

@@ -1,7 +1,7 @@
 package com.example.runner.OTHER
 
 import android.location.Location
-import com.example.runner.services.polyline
+import com.example.runner.OTHER.polyline
 import java.util.concurrent.TimeUnit
 
 object TrackingUtility {

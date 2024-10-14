@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:backgroundTint="#D2000000">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/mapImage"
+            android:layout_width="match_parent"
+            android:layout_height="370dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="map image"
+            android:scaleType="fitCenter"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cancelButton"
+            android:layout_width="44dp"
+            android:layout_height="50dp"
+            app:icon="@drawable/baseline_cancel_24"
+            android:layout_marginStart="14dp"
+            android:layout_marginTop="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:iconSize="48dp"
+            app:iconPadding="-3dp"
+            app:iconGravity="textEnd"
+            app:iconTint="@color/white"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/shareButton"
+            android:layout_width="42dp"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:cornerRadius="6dp"
+            app:iconGravity="textTop"
+            android:backgroundTint="@color/active_green"
+            app:icon="@drawable/baseline_share_24"
+            app:iconSize="25dp"
+            app:iconTint="@android:color/black"
+            />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/deleteButton"
+            android:layout_width="42dp"
+            android:layout_height="50dp"
+            android:layout_margin="10dp"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/shareButton"
+            app:cornerRadius="6dp"
+            app:iconGravity="textTop"
+            android:backgroundTint="@android:color/holo_red_light"
+            app:icon="@drawable/baseline_delete_24"
+            app:iconSize="25dp"
+            app:iconTint="@android:color/black"
+            />
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/dateField"
+            android:text="hello"
+            android:textColor="@color/white"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/mapImage"
+            android:textSize="18sp"
+            android:layout_marginTop="15dp"/>
+
+        <com.google.android.material.textview.MaterialTextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/timerField"
+            android:text="hello"
+            android:textColor="@color/white"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/dateField"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginTop="5dp"/>
+
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/timerField"
+            android:layout_marginTop="8dp"
+            android:padding="16dp"
+            android:weightSum="3"
+            android:layout_marginBottom="15dp"
+            >
+
+            <!-- Distance -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/distance_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="3dp"
+                    android:text="🏃"
+                    android:textColor="@android:color/white"
+                    android:textSize="24sp" />
+
+                <TextView
+                    android:id="@+id/distance_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1.198"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="8dp"
+                    android:textColor="@android:color/white"
+                    android:layout_toEndOf="@id/distance_icon"
+                    android:layout_alignTop="@id/distance_icon"
+                    android:layout_marginStart="4dp"/>
+            </LinearLayout>
+
+
+            <!-- Calories -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+
+                <TextView
+                    android:id="@+id/calories_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔥"
+                    android:layout_marginStart="35dp"
+                    android:textSize="24sp"
+                    android:textColor="@android:color/white"
+                    android:layout_centerHorizontal="true"
+                    />
+
+                <TextView
+                    android:id="@+id/calories_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="81"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="8dp"
+                    android:textColor="@android:color/white"
+                    android:layout_toEndOf="@id/calories_icon"
+                    android:layout_marginStart="4dp" />
+            </LinearLayout>
+
+            <!-- Speed -->
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_weight="1">
+                <TextView
+                    android:id="@+id/speed_icon"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚡"
+                    android:textSize="24sp"
+                    android:layout_marginStart="25dp"
+                    android:textColor="@android:color/white" />
+
+                <TextView
+                    android:id="@+id/speed_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="5.14"
+                    android:textSize="15sp"
+                    android:layout_marginBottom="8dp"
+                    android:textColor="@android:color/white"
+                    />
+            </LinearLayout>
+
+        </LinearLayout>
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</com.google.android.material.card.MaterialCardView>

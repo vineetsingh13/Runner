@@ -1,26 +1,22 @@
 package com.example.runner.services
 
 import android.Manifest
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
-import android.location.LocationRequest
 import android.os.Build
+import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Observer
-import com.example.runner.OTHER.Constants
 import com.example.runner.OTHER.Constants.ACTION_PAUSE_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_START_OR_RESUME_SERVICE
 import com.example.runner.OTHER.Constants.ACTION_STOP_SERVICE
@@ -28,9 +24,9 @@ import com.example.runner.OTHER.Constants.NOTIFICATION_CHANNEL_ID
 import com.example.runner.OTHER.Constants.NOTIFICATION_CHANNEL_NAME
 import com.example.runner.OTHER.Constants.NOTIFICATION_ID
 import com.example.runner.OTHER.Constants.TIMER_UPDATER_INTERVAL
+import com.example.runner.OTHER.TrackingSingleton
 import com.example.runner.OTHER.TrackingUtility
 import com.example.runner.R
-import com.example.runner.ui.MainActivity
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationResult
@@ -40,25 +36,35 @@ import com.google.android.gms.maps.model.LatLng
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import javax.inject.Inject
 
-typealias polyline=MutableList<LatLng>
-typealias polylines=MutableList<polyline>
+//typealias polyline=MutableList<LatLng>
+//typealias polylines=MutableList<polyline>
 
 @AndroidEntryPoint
-class TrackingService: LifecycleService() {
+class TrackingService: Service(){
 
     var isFirstRun=true
     var serviceKilled=false
+
+    private val serviceScope= CoroutineScope(SupervisorJob()+Dispatchers.Main)
+    private lateinit var locationClient: LocationClient
 
     @Inject
     lateinit var fusedLocationProviderClient: FusedLocationProviderClient
 
     //this is for updating the notifications because the notifications should not be updated that much frequently
-    private val timeRunSeconds = MutableLiveData<Long>()
+    private val _timeRunSeconds = MutableStateFlow(0L)
+    val timeRunSeconds: StateFlow<Long> = _timeRunSeconds.asStateFlow()
 
     @Inject
     lateinit var baseNotificationBuilder:NotificationCompat.Builder
@@ -68,35 +74,50 @@ class TrackingService: LifecycleService() {
     companion object{
 
         //this time is for updating on the screen
-        val timeRunInMillis=MutableLiveData<Long>()
-        val isTracking=MutableLiveData<Boolean>()
-        val pathPoints = MutableLiveData<polylines>()
+        //val timeRunInMillis=MutableLiveData<Long>()
+        private val _isTracking = MutableStateFlow(false)
+        val isTracking = _isTracking.asStateFlow()
+
+        //val pathPoints = MutableLiveData<polylines>()
+
     }
 
+
+
     private fun postInitialValues(){
-        timeRunSeconds.postValue(0L)
-        timeRunInMillis.postValue(0L)
-        isTracking.postValue(false)
-        pathPoints.postValue(mutableListOf())
+        _timeRunSeconds.value=0L
+        TrackingSingleton.timeRunInMillis.postValue(0L)
+        _isTracking.value=false
+        TrackingSingleton.pathPoints.postValue(mutableListOf())
     }
+
+    private lateinit var notificationManager: NotificationManager
 
     override fun onCreate() {
         super.onCreate()
         currentNotificationBuilder=baseNotificationBuilder
+        notificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         postInitialValues()
         fusedLocationProviderClient=LocationServices.getFusedLocationProviderClient(this)
 
-        isTracking.observe(this, Observer {
-            updateLocationTracking(it)
-            updateNotificationTrackingState(it)
-        })
+        locationClient=DefaultLocationClient(
+            applicationContext,
+            LocationServices.getFusedLocationProviderClient(applicationContext)
+        )
+        CoroutineScope(Dispatchers.Main).launch {
+            isTracking.collect { isTracking ->
+                updateLocationTracking(isTracking)
+                updateNotificationTrackingState(isTracking)
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-
+        super.onStartCommand(intent, flags, startId)
         intent?.let {
             when(it.action){
                 ACTION_START_OR_RESUME_SERVICE->{
+                    TrackingSingleton.isRunOn.postValue(true)
                     if (isFirstRun){
                         startForegroundService()
                         isFirstRun=false
@@ -111,11 +132,16 @@ class TrackingService: LifecycleService() {
                 }
                 ACTION_STOP_SERVICE->{
                     Timber.d("stopped service")
+                    TrackingSingleton.isRunOn.postValue(false)
                     killService()
                 }
             }
         }
-        return super.onStartCommand(intent, flags, startId)
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
     }
 
 
@@ -127,7 +153,7 @@ class TrackingService: LifecycleService() {
     //variable for total time
     private var timeRun=0L
 
-    private var timeStarted=0L
+    //private var timeStarted=0L
     private var lastSecondTimestamp=0L
 
 
@@ -139,46 +165,52 @@ class TrackingService: LifecycleService() {
         //in the startForeground service it will not stop until run is complete
         addEmptyPolyline()
 
-        isTracking.postValue(true)
-        timeStarted=System.currentTimeMillis()
+        _isTracking.value=true
+        //timeStarted=System.currentTimeMillis()
+        if (TrackingSingleton.timeStarted.value == null) {
+            TrackingSingleton.timeStarted.postValue(System.currentTimeMillis())
+        }
+        Log.d("system time", TrackingSingleton.timeStarted.value.toString())
         isTimerEnabled=true
 
         CoroutineScope(Dispatchers.Main).launch{
-            while (isTracking.value!!){
+            while (isTracking.value){
                 //time difference between now and timestarted
-                lapTime=System.currentTimeMillis()-timeStarted
+                lapTime=System.currentTimeMillis()-TrackingSingleton.timeStarted.value!!
 
                 //post the new lap time
-                timeRunInMillis.postValue(timeRun+lapTime)
+                _timeRunSeconds.value = (lapTime) / 1000
+                TrackingSingleton.timeRunInMillis.postValue(lapTime)
 
                 //so what this does is if the lastsecondtimestamp increases by 1 sec
                 //means the value of timeruninmillis will be less
                 //so we update seconds time and the timestamp
-                if(timeRunInMillis.value!! >= lastSecondTimestamp+1000L){
-                    timeRunSeconds.postValue(timeRunSeconds.value!! + 1)
+                if(TrackingSingleton.timeRunInMillis.value!! >= lastSecondTimestamp+1000L){
+                    _timeRunSeconds.value=timeRunSeconds.value!! + 1
                     lastSecondTimestamp += 1000L
                 }
                 delay(TIMER_UPDATER_INTERVAL)
             }
             //add the last lap time to our totaltime
-            timeRun += lapTime
+            //timeRun += lapTime
         }
     }
 
     //function to pause the service when the user clicks on stop button
     private fun pauseService(){
-        isTracking.postValue(false)
+        _isTracking.value=false
         isTimerEnabled=false
+        Log.d("system pause time", TrackingSingleton.timeStarted.value.toString())
     }
 
     //what this functions does is if the tracking is true
     //we want to receive location updates and if its not then we dont
     private fun updateLocationTracking(isTracking: Boolean){
         if(isTracking){
-            val request=com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,2000)
-                .setIntervalMillis(2000)
+            val request=com.google.android.gms.location.LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY,4000)
+                .setIntervalMillis(4000)
                 .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
-                .setMinUpdateIntervalMillis(2000)
+                .setMinUpdateIntervalMillis(3000)
                 .build()
 
             if (ActivityCompat.checkSelfPermission(
@@ -214,7 +246,9 @@ class TrackingService: LifecycleService() {
                 result.locations.let {
                     locations -> for (location in locations){
                         addPathPoint(location)
-                        Timber.d("new location: ${location.latitude},${location.longitude}")
+                        //Log.d("coordinates","new location: ${location.latitude},${location.longitude}")
+                        Log.d("coordinates", location.toString())
+
                     }
                 }
             }
@@ -227,10 +261,11 @@ class TrackingService: LifecycleService() {
     //then we add that list to pathPoints list
     private fun addPathPoint(location: Location?){
         location?.let {
-            val pos=LatLng(location.latitude, location.longitude)
-            pathPoints.value?.apply {
+            val pos= LatLng(location.latitude, location.longitude)
+            TrackingSingleton.pathPoints.value?.apply {
                 last().add(pos)
-                pathPoints.postValue(this)
+                TrackingSingleton.pathPoints.postValue(this)
+                Log.d("path", TrackingSingleton.pathPoints.value!!.last().last().toString())
             }
         }
     }
@@ -239,18 +274,17 @@ class TrackingService: LifecycleService() {
     //when the user stops the tracking and walks certain mile then that distance would not be considered
     //so instead of adding coordinated we add empty list when the user stops a run
     //also if the initial value is null we add the mutable list of list of coordiantes
-    private fun addEmptyPolyline()= pathPoints.value?.apply {
+    private fun addEmptyPolyline()= TrackingSingleton.pathPoints.value?.apply {
         add(mutableListOf())
-        pathPoints.postValue(this)
+        TrackingSingleton.pathPoints.postValue(this)
 
-    } ?: pathPoints.postValue(mutableListOf(mutableListOf()))
-
+    } ?: TrackingSingleton.pathPoints.postValue(mutableListOf(mutableListOf()))
 
 
     private fun startForegroundService(){
         startTimer()
-        isTracking.postValue(true)
-        val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        _isTracking.value=true
+
 
         if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.O){
             createNotificationChannel(notificationManager)
@@ -258,14 +292,17 @@ class TrackingService: LifecycleService() {
 
         notificationManager.notify(NOTIFICATION_ID,baseNotificationBuilder.build())
 
-        timeRunSeconds.observe(this, Observer {
-            if(!serviceKilled){
-                val notification=currentNotificationBuilder
-                    .setContentText(TrackingUtility.getFormattedStopWatchTime(it*1000L))
+        CoroutineScope(Dispatchers.Main).launch {
+            timeRunSeconds.collect { time ->
+                if (!serviceKilled) {
+                    val notification = currentNotificationBuilder
+                        .setContentText(TrackingUtility.getFormattedStopWatchTime(time * 1000L))
 
-                notificationManager.notify(NOTIFICATION_ID,notification.build())
+                    startForeground(1,notification.build())
+                    notificationManager.notify(NOTIFICATION_ID, notification.build())
+                }
             }
-        })
+        }
     }
 
 
@@ -278,6 +315,8 @@ class TrackingService: LifecycleService() {
             NOTIFICATION_CHANNEL_NAME,
             NotificationManager.IMPORTANCE_LOW
         )
+
+        channel.setSound(null,null)
         notificationManager.createNotificationChannel(channel)
     }
 
@@ -298,7 +337,7 @@ class TrackingService: LifecycleService() {
             PendingIntent.getService(this,2,resumeIntent,PendingIntent.FLAG_IMMUTABLE)
         }
 
-        val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
 
         currentNotificationBuilder.javaClass.getDeclaredField("mActions").apply {
             isAccessible=true
@@ -319,8 +358,20 @@ class TrackingService: LifecycleService() {
         isFirstRun=true
         pauseService()
         postInitialValues()
-        val notificationManager: NotificationManager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(NOTIFICATION_ID)
         stopSelf()
+        Log.d("PROCESS","PROCESS IS KILLED")
+    }
+
+
+//    override fun onTaskRemoved(rootIntent: Intent?) {
+//        super.onTaskRemoved(rootIntent)
+//        killService()
+//        stopSelf()
+//    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        serviceScope.cancel()
     }
 }

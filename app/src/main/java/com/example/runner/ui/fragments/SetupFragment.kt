@@ -14,6 +14,7 @@ import com.example.runner.OTHER.Constants.KEY_NAME
 import com.example.runner.OTHER.Constants.KEY_WEIGHT
 import com.example.runner.R
 import com.example.runner.databinding.FragmentSetupBinding
+import com.example.runner.ui.MainActivity
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textview.MaterialTextView
 import dagger.hilt.android.AndroidEntryPoint
@@ -66,7 +67,14 @@ class SetupFragment: Fragment(R.layout.fragment_setup) {
 
         binding=FragmentSetupBinding.inflate(layoutInflater)
 
+        (activity as MainActivity).binding.cardView.visibility=View.GONE
+
         return binding.root
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        (activity as MainActivity).binding.cardView.visibility=View.VISIBLE
     }
 
     private fun writePersonalDataToSharedPref(): Boolean {

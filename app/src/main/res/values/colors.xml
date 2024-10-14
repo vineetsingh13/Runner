@@ -26,4 +26,13 @@
     <color name="tertiary">#7D5260</color>
     <color name="tertiarycontainer">#FFD8E4</color>
     <color name="ontertiarycontainer">#31111D</color>
+
+    <color name="background">#131313</color>
+    <color name="active_green">#FF66FF66</color>
+
+    <color name="button_background">#2F2F2F</color>
+
+    <color name="gradient_blue">#000028</color>
+    <color name="gradient_orange">#FF7F50</color>
+
 </resources>
